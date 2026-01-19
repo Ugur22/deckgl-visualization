@@ -1,6 +1,7 @@
 import { TripData, TripWaypoint } from '../types';
 import { chargingStations, ChargingStation } from './chargingStations';
-import { fetchRoute, RouteGeometry } from '../services/routeService';
+import { RouteGeometry } from '../services/routeService';
+import precomputedRoutes from './precomputedRoutes.json';
 
 // Seeded random for consistent generation
 function seededRandom(seed: number): () => number {
@@ -48,39 +49,6 @@ function getBatteryColor(batteryPercent: number): [number, number, number] {
   return [255, 80, 80];                              // Red - low battery
 }
 
-// Calculate distance between two coordinates (Haversine formula)
-function getDistance(
-  coord1: [number, number],
-  coord2: [number, number]
-): number {
-  const R = 6371; // Earth's radius in km
-  const dLat = (coord2[1] - coord1[1]) * Math.PI / 180;
-  const dLon = (coord2[0] - coord1[0]) * Math.PI / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(coord1[1] * Math.PI / 180) *
-    Math.cos(coord2[1] * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-// Find nearby stations within a distance range
-function findNearbyStations(
-  station: ChargingStation,
-  minKm: number,
-  maxKm: number,
-  random: () => number
-): ChargingStation[] {
-  return chargingStations
-    .filter((s) => {
-      if (s.id === station.id) return false;
-      const dist = getDistance(station.coordinates, s.coordinates);
-      return dist >= minKm && dist <= maxKm;
-    })
-    .sort(() => random() - 0.5); // Shuffle for variety
-}
-
 // Generate EV trip routes between stations
 interface EVRoute {
   from: ChargingStation;
@@ -96,83 +64,6 @@ let evRoutes: EVRoute[] = [];
 
 function getRouteKey(fromId: string, toId: string): string {
   return `${fromId}-${toId}`;
-}
-
-// Generate EV-specific route network
-function generateEVRouteNetwork(random: () => number): EVRoute[] {
-  const routes: EVRoute[] = [];
-
-  // Get highway stations (these are key hubs)
-  const highwayStations = chargingStations.filter((s) => s.id.startsWith('highway-'));
-  const cityStations = chargingStations.filter((s) => !s.id.startsWith('highway-'));
-
-  // 1. Highway corridor trips (long-distance road trips)
-  highwayStations.forEach((station) => {
-    const nearby = findNearbyStations(station, 20, 80, random);
-    // Connect to 2-3 nearby highway stations
-    nearby.slice(0, 3).forEach((target) => {
-      if (target.id.startsWith('highway-')) {
-        routes.push({
-          from: station,
-          to: target,
-          tripType: 'roadtrip',
-          weight: 3 + Math.floor(random() * 4),
-        });
-      }
-    });
-  });
-
-  // 2. City to highway trips (people going on trips)
-  cityStations.forEach((station) => {
-    if (random() > 0.3) return; // Only 70% of city stations connect to highways
-    const nearbyHighway = highwayStations
-      .filter((h) => getDistance(station.coordinates, h.coordinates) < 40)
-      .sort(() => random() - 0.5)[0];
-
-    if (nearbyHighway) {
-      routes.push({
-        from: station,
-        to: nearbyHighway,
-        tripType: 'roadtrip',
-        weight: 2,
-      });
-    }
-  });
-
-  // 3. Local commuter trips (short city trips)
-  cityStations.forEach((station) => {
-    const nearbyCity = findNearbyStations(station, 3, 25, random);
-    // Connect to 1-2 nearby city stations
-    nearbyCity
-      .filter((s) => !s.id.startsWith('highway-'))
-      .slice(0, 2)
-      .forEach((target) => {
-        routes.push({
-          from: station,
-          to: target,
-          tripType: 'commuter',
-          weight: 4 + Math.floor(random() * 4),
-        });
-      });
-  });
-
-  // 4. Delivery routes (within cities, higher frequency)
-  // Pick stations with 'superfast' chargers as delivery hubs
-  const deliveryHubs = cityStations.filter((s) => s.type === 'superfast');
-  deliveryHubs.forEach((hub) => {
-    const nearbyStations = findNearbyStations(hub, 2, 15, random);
-    nearbyStations.slice(0, 4).forEach((target) => {
-      routes.push({
-        from: hub,
-        to: target,
-        tripType: 'delivery',
-        weight: 5 + Math.floor(random() * 5),
-      });
-    });
-  });
-
-  console.log(`Generated ${routes.length} EV route connections`);
-  return routes;
 }
 
 // Generate EV trip using real route geometry with battery simulation
@@ -232,69 +123,33 @@ function generateEVTripFromRoute(
   };
 }
 
-// Fetch all required routes from Mapbox for EV network
-export async function initializeRoutes(): Promise<void> {
+// Pre-computed routes structure from JSON
+interface PrecomputedRoutesData {
+  evRoutes: EVRoute[];
+  routeGeometries: Record<string, RouteGeometry>;
+}
+
+// Load pre-computed routes from static JSON file (synchronous)
+export function initializeRoutes(): void {
   if (routesLoaded) return;
 
-  console.log('Generating EV route network...');
-  const random = seededRandom(42);
-  evRoutes = generateEVRouteNetwork(random);
+  console.log('Loading pre-computed EV routes from JSON...');
 
-  console.log('Fetching route geometries from Mapbox...');
+  const data = precomputedRoutes as PrecomputedRoutesData;
 
-  // Collect unique route pairs
-  const routePairs: Array<{ from: ChargingStation; to: ChargingStation }> = [];
-  const seenKeys = new Set<string>();
+  // Load EV routes - need to map station IDs back to actual station objects
+  evRoutes = data.evRoutes.map((route: any) => ({
+    from: chargingStations.find(s => s.id === route.fromId) as ChargingStation,
+    to: chargingStations.find(s => s.id === route.toId) as ChargingStation,
+    tripType: route.tripType as 'commuter' | 'roadtrip' | 'delivery',
+    weight: route.weight,
+  })).filter(route => route.from && route.to);
 
-  evRoutes.forEach((route) => {
-    const key = getRouteKey(route.from.id, route.to.id);
-    const reverseKey = getRouteKey(route.to.id, route.from.id);
-
-    if (!seenKeys.has(key)) {
-      routePairs.push({ from: route.from, to: route.to });
-      seenKeys.add(key);
-    }
-    if (!seenKeys.has(reverseKey)) {
-      routePairs.push({ from: route.to, to: route.from });
-      seenKeys.add(reverseKey);
-    }
-  });
-
-  console.log(`Need to fetch ${routePairs.length} unique routes`);
-
-  // Fetch routes in batches
-  const batchSize = 5;
-  let fetched = 0;
-
-  for (let i = 0; i < routePairs.length; i += batchSize) {
-    const batch = routePairs.slice(i, i + batchSize);
-
-    const promises = batch.map(async ({ from, to }) => {
-      const key = getRouteKey(from.id, to.id);
-      if (routeGeometries.has(key)) return;
-
-      const route = await fetchRoute(from.coordinates, to.coordinates);
-      if (route) {
-        routeGeometries.set(key, route);
-        fetched++;
-      }
-    });
-
-    await Promise.all(promises);
-
-    // Progress update every 10 batches
-    if (fetched % 25 === 0 || i + batchSize >= routePairs.length) {
-      console.log(`Fetched ${fetched}/${routePairs.length} EV routes...`);
-    }
-
-    // Small delay to avoid rate limiting
-    if (i + batchSize < routePairs.length) {
-      await new Promise((resolve) => setTimeout(resolve, 150));
-    }
-  }
+  // Load route geometries into the Map
+  routeGeometries = new Map(Object.entries(data.routeGeometries));
 
   routesLoaded = true;
-  console.log(`EV route initialization complete! ${routeGeometries.size} routes cached.`);
+  console.log(`Loaded ${evRoutes.length} EV routes and ${routeGeometries.size} route geometries from pre-computed data.`);
 }
 
 // Generate EV trips using real routes between charging stations

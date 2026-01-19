@@ -6,7 +6,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 import { cities, arcData, INITIAL_VIEW_STATE, MAP_STYLE, MAPBOX_TOKEN } from '../data/netherlands';
 import { chargingStations } from '../data/chargingStations';
-import { MAX_TRIP_TIME, initializeRoutes, refreshTripData, areRoutesLoaded } from '../data/tripData';
+import { MAX_TRIP_TIME, initializeRoutes, refreshTripData } from '../data/tripData';
 import { TripData } from '../types';
 import { createColumnLayer } from '../layers/columnLayer';
 import { createScatterplotLayer } from '../layers/scatterplotLayer';
@@ -47,6 +47,11 @@ const getInitialViewState = (): ViewState => ({
   bearing: INITIAL_VIEW_STATE.bearing,
 });
 
+// Initialize routes at module level for instant availability
+// This runs once when the module is first imported
+initializeRoutes();
+const initialTripsData = refreshTripData();
+
 export function DeckGLMap() {
   const [activeLayer, setActiveLayer] = useState<LayerType>('trips');
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
@@ -59,22 +64,8 @@ export function DeckGLMap() {
   const [animationSpeed, setAnimationSpeed] = useState(0.50);
   const animationRef = useRef<number>();
 
-  // Route loading state
-  const [routesLoading, setRoutesLoading] = useState(false);
-  const [tripsData, setTripsData] = useState<TripData[]>([]);
-
-  // Load routes when trips layer is first selected
-  useEffect(() => {
-    if (activeLayer === 'trips' && !areRoutesLoaded() && !routesLoading) {
-      setRoutesLoading(true);
-
-      initializeRoutes().then(() => {
-        const data = refreshTripData();
-        setTripsData(data);
-        setRoutesLoading(false);
-      });
-    }
-  }, [activeLayer, routesLoading]);
+  // Trip data - initialized instantly from pre-computed routes at module level
+  const [tripsData] = useState<TripData[]>(initialTripsData);
 
   // Animation loop for trips layer
   useEffect(() => {
@@ -217,31 +208,7 @@ export function DeckGLMap() {
         <DetailPanel city={selectedCity} onClose={handleClosePanel} />
       )}
 
-      {activeLayer === 'trips' && routesLoading && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            padding: '24px 48px',
-            borderRadius: '12px',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
-            zIndex: 10,
-            textAlign: 'center',
-          }}
-        >
-          <div style={{ fontSize: '18px', fontWeight: 500, marginBottom: '8px' }}>
-            Loading Routes...
-          </div>
-          <div style={{ fontSize: '14px', color: '#666' }}>
-            Fetching real road data from Mapbox
-          </div>
-        </div>
-      )}
-
-      {activeLayer === 'trips' && !routesLoading && tripsData.length > 0 && (
+      {activeLayer === 'trips' && tripsData.length > 0 && (
         <AnimationControls
           isPlaying={isPlaying}
           currentTime={currentTime}
