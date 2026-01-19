@@ -166,6 +166,71 @@ function generateEVRouteNetwork(random: () => number): EVRoute[] {
     });
   });
 
+  // 5. Extra Amsterdam & Rotterdam routes (high traffic cities)
+  const amsterdamStations = cityStations.filter((s) => s.name.includes('Amsterdam'));
+  const rotterdamStations = cityStations.filter((s) => s.name.includes('Rotterdam'));
+
+  // Amsterdam-Rotterdam inter-city commuter corridor
+  amsterdamStations.slice(0, 8).forEach((amsStation) => {
+    rotterdamStations.slice(0, 6).forEach((rotStation) => {
+      if (random() > 0.6) return; // 40% chance to create route
+      routes.push({
+        from: amsStation,
+        to: rotStation,
+        tripType: 'roadtrip',
+        weight: 3 + Math.floor(random() * 3),
+      });
+    });
+  });
+
+  // Extra Amsterdam internal commuter routes
+  amsterdamStations.forEach((station) => {
+    const nearbyAms = amsterdamStations
+      .filter((s) => s.id !== station.id)
+      .sort(() => random() - 0.5)
+      .slice(0, 3);
+    nearbyAms.forEach((target) => {
+      routes.push({
+        from: station,
+        to: target,
+        tripType: 'commuter',
+        weight: 5 + Math.floor(random() * 5),
+      });
+    });
+  });
+
+  // Extra Rotterdam internal commuter routes
+  rotterdamStations.forEach((station) => {
+    const nearbyRot = rotterdamStations
+      .filter((s) => s.id !== station.id)
+      .sort(() => random() - 0.5)
+      .slice(0, 3);
+    nearbyRot.forEach((target) => {
+      routes.push({
+        from: station,
+        to: target,
+        tripType: 'commuter',
+        weight: 5 + Math.floor(random() * 5),
+      });
+    });
+  });
+
+  // Amsterdam & Rotterdam delivery hub boost
+  const amsDeliveryHubs = amsterdamStations.filter((s) => s.type === 'superfast' || s.type === 'fast');
+  const rotDeliveryHubs = rotterdamStations.filter((s) => s.type === 'superfast' || s.type === 'fast');
+
+  [...amsDeliveryHubs, ...rotDeliveryHubs].forEach((hub) => {
+    const nearbyStations = findNearbyStations(hub, chargingStations, 1, 20, random);
+    nearbyStations.slice(0, 6).forEach((target) => {
+      routes.push({
+        from: hub,
+        to: target,
+        tripType: 'delivery',
+        weight: 6 + Math.floor(random() * 6),
+      });
+    });
+  });
+
   return routes;
 }
 
