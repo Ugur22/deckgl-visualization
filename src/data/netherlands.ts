@@ -63,7 +63,7 @@ export const arcData: ArcData[] = [
 export const INITIAL_VIEW_STATE = {
   longitude: 5.2913,
   latitude: 52.1326,
-  zoom: 7,
+  zoom: 11,
   pitch: 45,
   bearing: 0,
 };
