@@ -66,6 +66,109 @@ function getRouteKey(fromId: string, toId: string): string {
   return `${fromId}-${toId}`;
 }
 
+// Calculate distance between two coordinates in km
+function getDistance(coord1: [number, number], coord2: [number, number]): number {
+  const R = 6371;
+  const dLat = (coord2[1] - coord1[1]) * Math.PI / 180;
+  const dLon = (coord2[0] - coord1[0]) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(coord1[1] * Math.PI / 180) *
+    Math.cos(coord2[1] * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Find nearby stations within distance range
+function findNearbyStations(
+  station: ChargingStation,
+  stations: ChargingStation[],
+  minKm: number,
+  maxKm: number,
+  random: () => number
+): ChargingStation[] {
+  return stations
+    .filter((s) => {
+      if (s.id === station.id) return false;
+      const dist = getDistance(station.coordinates, s.coordinates);
+      return dist >= minKm && dist <= maxKm;
+    })
+    .sort(() => random() - 0.5);
+}
+
+// Generate EV route network (deterministic with seed)
+function generateEVRouteNetwork(random: () => number): EVRoute[] {
+  const routes: EVRoute[] = [];
+
+  const highwayStations = chargingStations.filter((s) => s.id.startsWith('highway-'));
+  const cityStations = chargingStations.filter((s) => !s.id.startsWith('highway-'));
+
+  // 1. Highway corridor trips
+  highwayStations.forEach((station) => {
+    const nearby = findNearbyStations(station, chargingStations, 20, 80, random);
+    nearby.slice(0, 3).forEach((target) => {
+      if (target.id.startsWith('highway-')) {
+        routes.push({
+          from: station,
+          to: target,
+          tripType: 'roadtrip',
+          weight: 3 + Math.floor(random() * 4),
+        });
+      }
+    });
+  });
+
+  // 2. City to highway trips
+  cityStations.forEach((station) => {
+    if (random() > 0.3) return;
+    const nearbyHighway = highwayStations
+      .filter((h) => getDistance(station.coordinates, h.coordinates) < 40)
+      .sort(() => random() - 0.5)[0];
+
+    if (nearbyHighway) {
+      routes.push({
+        from: station,
+        to: nearbyHighway,
+        tripType: 'roadtrip',
+        weight: 2,
+      });
+    }
+  });
+
+  // 3. Local commuter trips
+  cityStations.forEach((station) => {
+    const nearbyCity = findNearbyStations(station, chargingStations, 3, 25, random);
+    nearbyCity
+      .filter((s) => !s.id.startsWith('highway-'))
+      .slice(0, 2)
+      .forEach((target) => {
+        routes.push({
+          from: station,
+          to: target,
+          tripType: 'commuter',
+          weight: 4 + Math.floor(random() * 4),
+        });
+      });
+  });
+
+  // 4. Delivery routes
+  const deliveryHubs = cityStations.filter((s) => s.type === 'superfast');
+  deliveryHubs.forEach((hub) => {
+    const nearbyStations = findNearbyStations(hub, chargingStations, 2, 15, random);
+    nearbyStations.slice(0, 4).forEach((target) => {
+      routes.push({
+        from: hub,
+        to: target,
+        tripType: 'delivery',
+        weight: 5 + Math.floor(random() * 5),
+      });
+    });
+  });
+
+  return routes;
+}
+
 // Generate EV trip using real route geometry with battery simulation
 function generateEVTripFromRoute(
   route: RouteGeometry,
@@ -123,33 +226,22 @@ function generateEVTripFromRoute(
   };
 }
 
-// Pre-computed routes structure from JSON
-interface PrecomputedRoutesData {
-  evRoutes: EVRoute[];
-  routeGeometries: Record<string, RouteGeometry>;
-}
-
 // Load pre-computed routes from static JSON file (synchronous)
 export function initializeRoutes(): void {
   if (routesLoaded) return;
 
-  console.log('Loading pre-computed EV routes from JSON...');
+  console.log('Loading pre-computed route geometries from JSON...');
 
-  const data = precomputedRoutes as PrecomputedRoutesData;
+  // Generate EV route network (fast, deterministic with seed 42)
+  const random = seededRandom(42);
+  evRoutes = generateEVRouteNetwork(random);
 
-  // Load EV routes - need to map station IDs back to actual station objects
-  evRoutes = data.evRoutes.map((route: any) => ({
-    from: chargingStations.find(s => s.id === route.fromId) as ChargingStation,
-    to: chargingStations.find(s => s.id === route.toId) as ChargingStation,
-    tripType: route.tripType as 'commuter' | 'roadtrip' | 'delivery',
-    weight: route.weight,
-  })).filter(route => route.from && route.to);
-
-  // Load route geometries into the Map
-  routeGeometries = new Map(Object.entries(data.routeGeometries));
+  // Load route geometries from JSON (flat object of route key -> geometry)
+  const geometries = precomputedRoutes as unknown as Record<string, RouteGeometry>;
+  routeGeometries = new Map(Object.entries(geometries));
 
   routesLoaded = true;
-  console.log(`Loaded ${evRoutes.length} EV routes and ${routeGeometries.size} route geometries from pre-computed data.`);
+  console.log(`Generated ${evRoutes.length} EV routes, loaded ${routeGeometries.size} route geometries from pre-computed data.`);
 }
 
 // Generate EV trips using real routes between charging stations
