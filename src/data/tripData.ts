@@ -166,67 +166,89 @@ function generateEVRouteNetwork(random: () => number): EVRoute[] {
     });
   });
 
-  // 5. Extra Amsterdam & Rotterdam routes (high traffic cities)
-  const amsterdamStations = cityStations.filter((s) => s.name.includes('Amsterdam'));
-  const rotterdamStations = cityStations.filter((s) => s.name.includes('Rotterdam'));
+  // 5. Extra routes for all major cities (high traffic)
+  const majorCities = [
+    { name: 'Amsterdam', weight: 8 },
+    { name: 'Rotterdam', weight: 7 },
+    { name: 'The Hague', weight: 6 },
+    { name: 'Utrecht', weight: 6 },
+    { name: 'Eindhoven', weight: 5 },
+    { name: 'Groningen', weight: 4 },
+    { name: 'Tilburg', weight: 4 },
+    { name: 'Almere', weight: 4 },
+    { name: 'Breda', weight: 3 },
+    { name: 'Nijmegen', weight: 3 },
+  ];
 
-  // Amsterdam-Rotterdam inter-city commuter corridor
-  amsterdamStations.slice(0, 8).forEach((amsStation) => {
-    rotterdamStations.slice(0, 6).forEach((rotStation) => {
-      if (random() > 0.6) return; // 40% chance to create route
-      routes.push({
-        from: amsStation,
-        to: rotStation,
-        tripType: 'roadtrip',
-        weight: 3 + Math.floor(random() * 3),
+  const cityStationGroups = majorCities.map((city) => ({
+    ...city,
+    stations: cityStations.filter((s) => s.name.includes(city.name)),
+  }));
+
+  // Inter-city corridors between major cities
+  const corridors = [
+    ['Amsterdam', 'Rotterdam'],
+    ['Amsterdam', 'Utrecht'],
+    ['Amsterdam', 'The Hague'],
+    ['Amsterdam', 'Almere'],
+    ['Rotterdam', 'The Hague'],
+    ['Rotterdam', 'Breda'],
+    ['Utrecht', 'Eindhoven'],
+    ['Utrecht', 'Nijmegen'],
+    ['Eindhoven', 'Tilburg'],
+    ['Eindhoven', 'Nijmegen'],
+    ['The Hague', 'Rotterdam'],
+    ['Groningen', 'Almere'],
+  ];
+
+  corridors.forEach(([cityA, cityB]) => {
+    const groupA = cityStationGroups.find((g) => g.name === cityA);
+    const groupB = cityStationGroups.find((g) => g.name === cityB);
+    if (!groupA || !groupB) return;
+
+    groupA.stations.slice(0, 6).forEach((stationA) => {
+      groupB.stations.slice(0, 5).forEach((stationB) => {
+        if (random() > 0.5) return; // 50% chance to create route
+        routes.push({
+          from: stationA,
+          to: stationB,
+          tripType: 'roadtrip',
+          weight: 2 + Math.floor(random() * 3),
+        });
       });
     });
   });
 
-  // Extra Amsterdam internal commuter routes
-  amsterdamStations.forEach((station) => {
-    const nearbyAms = amsterdamStations
-      .filter((s) => s.id !== station.id)
-      .sort(() => random() - 0.5)
-      .slice(0, 3);
-    nearbyAms.forEach((target) => {
-      routes.push({
-        from: station,
-        to: target,
-        tripType: 'commuter',
-        weight: 5 + Math.floor(random() * 5),
+  // Extra internal commuter routes for each major city
+  cityStationGroups.forEach(({ stations, weight }) => {
+    stations.forEach((station) => {
+      const nearby = stations
+        .filter((s) => s.id !== station.id)
+        .sort(() => random() - 0.5)
+        .slice(0, 3);
+      nearby.forEach((target) => {
+        routes.push({
+          from: station,
+          to: target,
+          tripType: 'commuter',
+          weight: weight + Math.floor(random() * 4),
+        });
       });
     });
   });
 
-  // Extra Rotterdam internal commuter routes
-  rotterdamStations.forEach((station) => {
-    const nearbyRot = rotterdamStations
-      .filter((s) => s.id !== station.id)
-      .sort(() => random() - 0.5)
-      .slice(0, 3);
-    nearbyRot.forEach((target) => {
-      routes.push({
-        from: station,
-        to: target,
-        tripType: 'commuter',
-        weight: 5 + Math.floor(random() * 5),
-      });
-    });
-  });
-
-  // Amsterdam & Rotterdam delivery hub boost
-  const amsDeliveryHubs = amsterdamStations.filter((s) => s.type === 'superfast' || s.type === 'fast');
-  const rotDeliveryHubs = rotterdamStations.filter((s) => s.type === 'superfast' || s.type === 'fast');
-
-  [...amsDeliveryHubs, ...rotDeliveryHubs].forEach((hub) => {
-    const nearbyStations = findNearbyStations(hub, chargingStations, 1, 20, random);
-    nearbyStations.slice(0, 6).forEach((target) => {
-      routes.push({
-        from: hub,
-        to: target,
-        tripType: 'delivery',
-        weight: 6 + Math.floor(random() * 6),
+  // Delivery hub boost for all major cities
+  cityStationGroups.forEach(({ stations, weight }) => {
+    const deliveryHubs = stations.filter((s) => s.type === 'superfast' || s.type === 'fast');
+    deliveryHubs.forEach((hub) => {
+      const nearbyStations = findNearbyStations(hub, chargingStations, 1, 20, random);
+      nearbyStations.slice(0, 5).forEach((target) => {
+        routes.push({
+          from: hub,
+          to: target,
+          tripType: 'delivery',
+          weight: weight + Math.floor(random() * 5),
+        });
       });
     });
   });
