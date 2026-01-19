@@ -48,7 +48,7 @@ const getInitialViewState = (): ViewState => ({
 });
 
 export function DeckGLMap() {
-  const [activeLayer, setActiveLayer] = useState<LayerType>('all');
+  const [activeLayer, setActiveLayer] = useState<LayerType>('trips');
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
   const [selectedCity, setSelectedCity] = useState<City | null>(null);
   const [viewState, setViewState] = useState<ViewState>(getInitialViewState);
