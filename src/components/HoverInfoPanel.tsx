@@ -1,11 +1,11 @@
-import { HoverInfo, City, ArcData } from '../types';
+import { HoverInfo, City, ArcData, TripData } from '../types';
 import { ChargingStation } from '../data/chargingStations';
 
 interface HoverInfoPanelProps {
   hoverInfo: HoverInfo | null;
 }
 
-type HoverObject = City | ArcData | ChargingStation;
+type HoverObject = City | ArcData | ChargingStation | TripData;
 
 function isCity(obj: HoverObject): obj is City {
   return 'name' in obj && 'population' in obj;
@@ -18,6 +18,22 @@ function isChargingStation(obj: HoverObject): obj is ChargingStation {
 function isArcData(obj: HoverObject): obj is ArcData {
   return 'source' in obj && 'target' in obj;
 }
+
+function isTripData(obj: HoverObject): obj is TripData {
+  return 'waypoints' in obj && 'vehicle' in obj;
+}
+
+const tripTypeLabels: Record<string, string> = {
+  commuter: 'Commuter',
+  roadtrip: 'Road Trip',
+  delivery: 'Delivery',
+};
+
+const tripTypeColors: Record<string, string> = {
+  commuter: '#82c896',
+  roadtrip: '#64b57d',
+  delivery: '#b96e5a',
+};
 
 const typeColors = {
   superfast: '#00ff88',
@@ -89,6 +105,61 @@ export function HoverInfoPanel({ hoverInfo }: HoverInfoPanelProps) {
           <div>
             {object.source.name} → {object.target.name}
           </div>
+        </>
+      );
+    }
+
+    if (isTripData(object)) {
+      const tripType = object.tripType || 'commuter';
+      const tripColor = tripTypeColors[tripType] || '#888';
+
+      return (
+        <>
+          <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '8px' }}>
+            {object.vehicleBrand || object.vehicle}
+          </div>
+          {object.tripType && (
+            <div style={{ marginBottom: '8px' }}>
+              <span
+                style={{
+                  backgroundColor: tripColor,
+                  color: '#fff',
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                  fontSize: '11px',
+                  fontWeight: 500,
+                }}
+              >
+                {tripTypeLabels[object.tripType]}
+              </span>
+            </div>
+          )}
+          {object.fromStationName && object.toStationName && (
+            <div style={{ marginBottom: '4px' }}>
+              <span style={{ color: '#aaa' }}>Route:</span>{' '}
+              <span style={{ fontSize: '12px' }}>
+                {object.fromStationName.split(' ').slice(0, 2).join(' ')} → {object.toStationName.split(' ').slice(0, 2).join(' ')}
+              </span>
+            </div>
+          )}
+          {object.batteryStart !== undefined && object.batteryEnd !== undefined && (
+            <div style={{ marginBottom: '4px' }}>
+              <span style={{ color: '#aaa' }}>Battery:</span>{' '}
+              <span style={{ color: object.batteryStart > 60 ? '#81c784' : object.batteryStart > 30 ? '#ffb74d' : '#e57373' }}>
+                {object.batteryStart}%
+              </span>
+              {' → '}
+              <span style={{ color: object.batteryEnd > 60 ? '#81c784' : object.batteryEnd > 30 ? '#ffb74d' : '#e57373' }}>
+                {object.batteryEnd}%
+              </span>
+            </div>
+          )}
+          {object.distanceKm !== undefined && (
+            <div>
+              <span style={{ color: '#aaa' }}>Distance:</span>{' '}
+              <span style={{ color: '#64b5f6' }}>{object.distanceKm} km</span>
+            </div>
+          )}
         </>
       );
     }

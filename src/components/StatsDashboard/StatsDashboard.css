@@ -1,0 +1,162 @@
+.stats-dashboard {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 10px;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.stats-group {
+  display: flex;
+  align-items: center;
+  background: rgba(20, 25, 35, 0.92);
+  backdrop-filter: blur(8px);
+  border-radius: 8px;
+  padding: 8px 14px;
+  gap: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  pointer-events: auto;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.stat-item.compact {
+  flex-direction: row;
+  gap: 6px;
+}
+
+.stat-label {
+  font-size: 10px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1;
+}
+
+.stat-value.high {
+  color: #e57373;
+}
+
+.stat-value.medium {
+  color: #ffb74d;
+}
+
+.stat-value.low {
+  color: #81c784;
+}
+
+.stat-detail {
+  font-size: 10px;
+  color: #666;
+}
+
+.stat-divider {
+  width: 1px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.stat-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.stat-badge.superfast {
+  background: rgb(60, 180, 130);
+}
+
+.stat-badge.fast {
+  background: rgb(70, 145, 190);
+}
+
+.stat-badge.standard {
+  background: rgb(200, 165, 70);
+}
+
+.stat-mini {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #bbb;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot.commuter {
+  background: rgb(130, 200, 150);
+}
+
+.dot.delivery {
+  background: rgb(185, 110, 90);
+}
+
+.dot.roadtrip {
+  background: rgb(100, 180, 130);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .stats-dashboard {
+    top: 60px;
+    left: 10px;
+    right: 10px;
+    gap: 8px;
+  }
+
+  .stats-group {
+    padding: 6px 10px;
+    gap: 8px;
+  }
+
+  .stat-value {
+    font-size: 16px;
+  }
+
+  .stat-label {
+    font-size: 9px;
+  }
+
+  .stat-badge {
+    min-width: 24px;
+    height: 18px;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-dashboard {
+    flex-direction: column;
+  }
+
+  .stats-group {
+    width: fit-content;
+  }
+}

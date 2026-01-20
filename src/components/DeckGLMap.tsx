@@ -17,6 +17,10 @@ import { LayerControls } from './LayerControls';
 import { HoverInfoPanel } from './HoverInfoPanel';
 import { DetailPanel } from './DetailPanel';
 import { AnimationControls } from './AnimationControls';
+import { Legend, StationType, TripType } from './Legend';
+import { StatsDashboard } from './StatsDashboard';
+import { StationDetailPanel } from './StationDetailPanel';
+import { ChargingStation } from '../data/chargingStations';
 import { LayerType, HoverInfo, City, ArcData } from '../types';
 
 interface ViewState {
@@ -34,8 +38,12 @@ const containerStyle: React.CSSProperties = {
   position: 'relative',
 };
 
-function isCity(obj: City | ArcData): obj is City {
+function isCity(obj: City | ArcData | ChargingStation): obj is City {
   return 'name' in obj && 'population' in obj;
+}
+
+function isChargingStation(obj: City | ArcData | ChargingStation): obj is ChargingStation {
+  return 'chargers' in obj && 'operator' in obj;
 }
 
 // Best Practice 5.5: Use lazy state initialization
@@ -56,6 +64,7 @@ export function DeckGLMap() {
   const [activeLayer, setActiveLayer] = useState<LayerType>('trips');
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
   const [selectedCity, setSelectedCity] = useState<City | null>(null);
+  const [selectedStation, setSelectedStation] = useState<ChargingStation | null>(null);
   const [viewState, setViewState] = useState<ViewState>(getInitialViewState);
 
   // Animation state for trips layer
@@ -66,6 +75,14 @@ export function DeckGLMap() {
 
   // Trip data - initialized instantly from pre-computed routes at module level
   const [tripsData] = useState<TripData[]>(initialTripsData);
+
+  // Filter states for Legend
+  const [stationFilters, setStationFilters] = useState<Set<StationType>>(
+    () => new Set(['superfast', 'fast', 'standard'])
+  );
+  const [tripFilters, setTripFilters] = useState<Set<TripType>>(
+    () => new Set(['high_battery', 'medium_battery', 'low_battery', 'delivery'])
+  );
 
   // Animation loop for trips layer
   useEffect(() => {
@@ -115,16 +132,16 @@ export function DeckGLMap() {
     }
     if (activeLayer === 'trips') {
       // Add charging stations layer (instead of city columns)
-      result.push(createChargingStationLayer(chargingStations));
+      result.push(createChargingStationLayer(chargingStations, selectedStation?.id, stationFilters));
 
       // Add trips animation if loaded
       if (tripsData.length > 0) {
-        result.push(createTripsLayer(tripsData, currentTime));
+        result.push(createTripsLayer(tripsData, currentTime, 50, tripFilters));
       }
     }
 
     return result;
-  }, [activeLayer, selectedCity, currentTime, tripsData]);
+  }, [activeLayer, selectedCity, selectedStation, currentTime, tripsData, stationFilters, tripFilters]);
 
   const onHover = useCallback((info: PickingInfo<City | ArcData>) => {
     if (info.object) {
@@ -139,12 +156,21 @@ export function DeckGLMap() {
     }
   }, []);
 
-  const onClick = useCallback((info: PickingInfo<City | ArcData>) => {
-    if (info.object && isCity(info.object)) {
-      const clickedCity = info.object;
-      setSelectedCity((prev) =>
-        prev?.name === clickedCity.name ? null : clickedCity
-      );
+  const onClick = useCallback((info: PickingInfo<City | ArcData | ChargingStation>) => {
+    if (info.object) {
+      if (isCity(info.object)) {
+        const clickedCity = info.object;
+        setSelectedCity((prev) =>
+          prev?.name === clickedCity.name ? null : clickedCity
+        );
+        setSelectedStation(null);
+      } else if (isChargingStation(info.object)) {
+        const clickedStation = info.object;
+        setSelectedStation((prev) =>
+          prev?.id === clickedStation.id ? null : clickedStation
+        );
+        setSelectedCity(null);
+      }
     }
   }, []);
 
@@ -166,10 +192,19 @@ export function DeckGLMap() {
   const handleLayerChange = useCallback((layer: LayerType) => {
     setActiveLayer(layer);
     setSelectedCity(null);
+    setSelectedStation(null);
   }, []);
 
   const handleClosePanel = useCallback(() => {
     setSelectedCity(null);
+  }, []);
+
+  const handleCloseStationPanel = useCallback(() => {
+    setSelectedStation(null);
+  }, []);
+
+  const handleStationSelect = useCallback((station: ChargingStation) => {
+    setSelectedStation(station);
   }, []);
 
   const handlePlayPause = useCallback(() => {
@@ -204,8 +239,34 @@ export function DeckGLMap() {
       <LayerControls activeLayer={activeLayer} onLayerChange={handleLayerChange} />
       <HoverInfoPanel hoverInfo={hoverInfo} />
 
+      {activeLayer === 'trips' && (
+        <>
+          <Legend
+            stationFilters={stationFilters}
+            tripFilters={tripFilters}
+            onStationFilterChange={setStationFilters}
+            onTripFilterChange={setTripFilters}
+            showTrips={tripsData.length > 0}
+          />
+          <StatsDashboard
+            stations={chargingStations}
+            trips={tripsData}
+            stationFilters={stationFilters}
+            tripFilters={tripFilters}
+          />
+        </>
+      )}
+
       {selectedCity && (
         <DetailPanel city={selectedCity} onClose={handleClosePanel} />
+      )}
+
+      {selectedStation && (
+        <StationDetailPanel
+          station={selectedStation}
+          onClose={handleCloseStationPanel}
+          onStationSelect={handleStationSelect}
+        />
       )}
 
       {activeLayer === 'trips' && tripsData.length > 0 && (

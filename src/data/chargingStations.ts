@@ -1,3 +1,8 @@
+export interface UtilizationDataPoint {
+  hour: number;
+  utilization: number;
+}
+
 export interface ChargingStation {
   id: string;
   name: string;
@@ -6,6 +11,8 @@ export interface ChargingStation {
   type: 'fast' | 'superfast' | 'standard';
   operator: string;
   available: number; // Currently available chargers
+  pricePerKwh: number; // Price in EUR per kWh
+  utilizationHistory: UtilizationDataPoint[]; // 24-hour utilization
 }
 
 // Seeded random for consistent generation
@@ -100,6 +107,21 @@ function generateStationsAroundCity(
                      type === 'fast' ? 4 + Math.floor(random() * 6) :
                      2 + Math.floor(random() * 4);
 
+    // Generate price based on type
+    const pricePerKwh = type === 'superfast' ? 0.45 + random() * 0.20
+      : type === 'fast' ? 0.35 + random() * 0.15
+      : 0.25 + random() * 0.10;
+
+    // Generate 24-hour utilization pattern (higher during day, peaks at morning/evening commute)
+    const utilizationHistory: UtilizationDataPoint[] = Array.from({ length: 24 }, (_, hour) => {
+      const baseUtil = hour >= 7 && hour <= 9 ? 0.7 + random() * 0.25 // Morning peak
+        : hour >= 17 && hour <= 19 ? 0.75 + random() * 0.20 // Evening peak
+        : hour >= 10 && hour <= 16 ? 0.4 + random() * 0.3 // Midday
+        : hour >= 20 && hour <= 23 ? 0.3 + random() * 0.25 // Evening
+        : 0.1 + random() * 0.15; // Night
+      return { hour, utilization: Math.round(baseUtil * 100) };
+    });
+
     stations.push({
       id: `station-${startId + i}`,
       name: `${cityName} ${['Noord', 'Zuid', 'Oost', 'West', 'Centrum', 'Station', 'Park', 'Mall'][Math.floor(random() * 8)]} ${i + 1}`,
@@ -108,6 +130,8 @@ function generateStationsAroundCity(
       type,
       operator: operators[Math.floor(random() * operators.length)],
       available: Math.floor(random() * (chargers + 1)),
+      pricePerKwh: Math.round(pricePerKwh * 100) / 100,
+      utilizationHistory,
     });
   }
 
@@ -127,6 +151,17 @@ function generateHighwayStation(
   const lng = coords[0] + (random() - 0.5) * 0.01;
   const lat = coords[1] + (random() - 0.5) * 0.01;
 
+  // Generate price based on type (highway stations slightly more expensive)
+  const pricePerKwh = type === 'superfast' ? 0.50 + random() * 0.20
+    : 0.40 + random() * 0.15;
+
+  // Highway stations have more consistent utilization throughout the day
+  const utilizationHistory: UtilizationDataPoint[] = Array.from({ length: 24 }, (_, hour) => {
+    const baseUtil = hour >= 6 && hour <= 22 ? 0.5 + random() * 0.35 // Daytime
+      : 0.2 + random() * 0.2; // Night
+    return { hour, utilization: Math.round(baseUtil * 100) };
+  });
+
   return {
     id: `highway-${id}`,
     name: `${name} Charging Plaza`,
@@ -135,6 +170,8 @@ function generateHighwayStation(
     type,
     operator: operators[Math.floor(random() * operators.length)],
     available: Math.floor(random() * (chargers + 1)),
+    pricePerKwh: Math.round(pricePerKwh * 100) / 100,
+    utilizationHistory,
   };
 }
 
@@ -167,9 +204,9 @@ export function generateChargingStations(): ChargingStation[] {
 // Pre-generated data
 export const chargingStations: ChargingStation[] = generateChargingStations();
 
-// Color schemes for different station types
+// Color schemes for different station types - balanced palette (distinct but not neon)
 export const stationColors = {
-  superfast: [0, 255, 136] as [number, number, number],    // Bright green
-  fast: [0, 200, 255] as [number, number, number],         // Cyan
-  standard: [255, 200, 0] as [number, number, number],     // Yellow
+  superfast: [60, 180, 130] as [number, number, number],   // Teal green
+  fast: [70, 145, 190] as [number, number, number],        // Ocean blue
+  standard: [200, 165, 70] as [number, number, number],    // Warm amber
 };

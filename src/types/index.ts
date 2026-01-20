@@ -1,3 +1,6 @@
+import { ChargingStation } from '../data/chargingStations';
+import { TripData as TripDataType } from './trip';
+
 export interface PopulationDataPoint {
   year: number;
   population: number;
@@ -27,7 +30,7 @@ export type LayerType = 'columns' | 'scatter' | 'arcs' | 'trips' | 'all';
 export type { TripWaypoint, TripData } from './trip';
 
 export interface HoverInfo {
-  object?: City | ArcData;
+  object?: City | ArcData | ChargingStation | TripDataType;
   x: number;
   y: number;
   layer?: { id: string } | null;

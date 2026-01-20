@@ -42,11 +42,11 @@ const evTypes: EVType[] = [
   { type: 'van', brand: 'Rivian EDV', color: [0, 50, 100], speedMult: 0.85, rangeKm: 300 },
 ];
 
-// Battery level colors
+// Battery level colors - balanced palette (distinct but not neon)
 function getBatteryColor(batteryPercent: number): [number, number, number] {
-  if (batteryPercent > 60) return [0, 255, 136];    // Green - good charge
-  if (batteryPercent > 30) return [255, 200, 0];    // Yellow - medium
-  return [255, 80, 80];                              // Red - low battery
+  if (batteryPercent > 60) return [70, 185, 125];   // Fresh green - good charge
+  if (batteryPercent > 30) return [205, 175, 65];   // Golden - medium
+  return [195, 95, 95];                              // Dusty coral - low battery
 }
 
 // Generate EV trip routes between stations
@@ -284,19 +284,19 @@ function generateEVTripFromRoute(
   // Color based on trip type and battery
   let color: [number, number, number];
   if (evRoute.tripType === 'delivery') {
-    // Delivery vehicles in amber/orange
-    color = [255, 160, 0];
+    // Delivery vehicles in terracotta
+    color = [185, 110, 90];
   } else if (evRoute.tripType === 'roadtrip') {
     // Long trips show battery status more prominently
     color = getBatteryColor(avgBattery);
   } else {
     // Commuters - slight tint based on battery
     const batteryColor = getBatteryColor(avgBattery);
-    // Mix with white for a lighter appearance
+    // Mix with white for a lighter appearance (reduced from +80 to +40)
     color = [
-      Math.min(255, batteryColor[0] + 80),
-      Math.min(255, batteryColor[1] + 80),
-      Math.min(255, batteryColor[2] + 80),
+      Math.min(255, batteryColor[0] + 40),
+      Math.min(255, batteryColor[1] + 40),
+      Math.min(255, batteryColor[2] + 40),
     ];
   }
 
@@ -310,6 +310,14 @@ function generateEVTripFromRoute(
     waypoints,
     vehicle: ev.type,
     color,
+    // Enhanced metadata for interactivity
+    vehicleBrand: ev.brand,
+    fromStationName: evRoute.from.name,
+    toStationName: evRoute.to.name,
+    tripType: evRoute.tripType,
+    batteryStart: Math.round(startBattery),
+    batteryEnd: Math.round(endBattery),
+    distanceKm: Math.round(tripDistanceKm * 10) / 10,
   };
 }
 
