@@ -72,12 +72,13 @@ export const INITIAL_VIEW_STATE = {
 // Mapbox styles
 export const MAP_STYLES = {
   CUSTOM: 'mapbox://styles/ugur222/cmjevlbg9005601qq5641bgl0',
+  CUSTOM_V2: 'mapbox://styles/ugur22/cjvpc96ky16c91ck6woz0ih5d',
   LIGHT: 'mapbox://styles/mapbox/light-v11',
   DARK: 'mapbox://styles/mapbox/dark-v11',
   STREETS: 'mapbox://styles/mapbox/streets-v12',
 } as const;
 
-export const MAP_STYLE = MAP_STYLES.CUSTOM;
+export const MAP_STYLE = MAP_STYLES.CUSTOM_V2;
 
 // Mapbox access token
 export const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
