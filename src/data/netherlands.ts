@@ -78,7 +78,7 @@ export const MAP_STYLES = {
   STREETS: 'mapbox://styles/mapbox/streets-v12',
 } as const;
 
-export const MAP_STYLE = MAP_STYLES.CUSTOM_V2;
+export const MAP_STYLE = MAP_STYLES.CUSTOM;
 
 // Mapbox access token
 export const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
