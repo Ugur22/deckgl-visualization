@@ -27,6 +27,12 @@ const random = seededRandom(123);
 
 const operators = ['Tesla', 'Fastned', 'Shell Recharge', 'Allego', 'Ionity', 'BP Pulse', 'EVBox'];
 
+// Coastal boundaries to prevent stations from being placed in water
+// The Hague: coastline curves near Scheveningen, so use 4.30 to ensure all stations are on land
+const coastalBoundaries: Record<string, { minLng: number }> = {
+  'The Hague': { minLng: 4.30 },
+};
+
 // Major city centers for dense station placement
 const cityHubs: { name: string; coords: [number, number]; density: number }[] = [
   { name: 'Amsterdam', coords: [4.895168, 52.370216], density: 25 },
@@ -93,14 +99,28 @@ function generateStationsAroundCity(
   startId: number
 ): ChargingStation[] {
   const stations: ChargingStation[] = [];
+  const boundary = coastalBoundaries[cityName];
 
   for (let i = 0; i < count; i++) {
     // Random position within city radius (0.02-0.08 degrees, roughly 2-8km)
-    const angle = random() * Math.PI * 2;
-    const distance = 0.02 + random() * 0.06;
+    // Use do-while to regenerate coordinates if they fall in water
+    let lng: number;
+    let lat: number;
+    let attempts = 0;
+    const maxAttempts = 10;
 
-    const lng = center[0] + Math.cos(angle) * distance;
-    const lat = center[1] + Math.sin(angle) * distance * 0.7; // Adjust for lat/lng ratio
+    do {
+      const angle = random() * Math.PI * 2;
+      const distance = 0.02 + random() * 0.06;
+      lng = center[0] + Math.cos(angle) * distance;
+      lat = center[1] + Math.sin(angle) * distance * 0.7; // Adjust for lat/lng ratio
+      attempts++;
+    } while (boundary && lng < boundary.minLng && attempts < maxAttempts);
+
+    // Clamp to boundary as fallback if still invalid
+    if (boundary && lng < boundary.minLng) {
+      lng = boundary.minLng + random() * 0.01;
+    }
 
     const type = random() < 0.2 ? 'superfast' : random() < 0.5 ? 'fast' : 'standard';
     const chargers = type === 'superfast' ? 8 + Math.floor(random() * 8) :
